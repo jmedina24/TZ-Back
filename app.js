@@ -17,11 +17,13 @@ app.use(bodyParser.json());
 const authRoutes = require('./router/auth');
 const userRoutes = require('./router/user');
 const categories = require('./router/category');
+const productRoutes = require('./router/product');
 
 // Configuración de rutas
 app.use(`/api/${apiVersion}`, authRoutes);
 app.use(`/api/${apiVersion}`, userRoutes);
 app.use(`/api/${apiVersion}/categories`, categories);
+app.use(`/api/${apiVersion}`, productRoutes);
 
 
 // Configuración de Static Folder

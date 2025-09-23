@@ -51,6 +51,9 @@ const UserSchema = new mongoose.Schema({
     role: { type: String, default: 'user' },
     active: { type: Boolean, default: true },
     avatar: String,
+    verificationToken: String,
+    resetPasswordToken: {type: String, default: null},
+    resetPasswordExpires: {type: Date, default: null},
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);
