@@ -16,10 +16,12 @@ app.use(bodyParser.json());
 // Importación de rutas
 const authRoutes = require('./router/auth');
 const userRoutes = require('./router/user');
+const categories = require('./router/category');
 
 // Configuración de rutas
 app.use(`/api/${apiVersion}`, authRoutes);
 app.use(`/api/${apiVersion}`, userRoutes);
+app.use(`/api/${apiVersion}/categories`, categories);
 
 
 // Configuración de Static Folder
