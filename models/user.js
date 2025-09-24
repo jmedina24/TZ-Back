@@ -14,7 +14,7 @@ const phoneSchema = new mongoose.Schema({
 }, { _id: false });
 
 const favouriteSchema = new mongoose.Schema({
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Producto' },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     addedOn: { type: Date, default: Date.now },
 }, { _id: false });
 

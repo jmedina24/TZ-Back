@@ -1,4 +1,5 @@
 const User = require("../models/user");
+const mongoose = require("mongoose");
 
 async function getMe(req, res) {
   const { user_id } = req.user;
@@ -110,7 +111,13 @@ async function addCard(req, res) {
       bank,
     } = req.body;
 
-    if (!cardNumber || !cardHolder || !expirationMonth || !expirationYear || !securityCode) {
+    if (
+      !cardNumber ||
+      !cardHolder ||
+      !expirationMonth ||
+      !expirationYear ||
+      !securityCode
+    ) {
       return res
         .status(400)
         .send({ msg: `Todos los campos deben de completarse...` });
@@ -141,16 +148,124 @@ async function addCard(req, res) {
 }
 
 async function getCard(req, res) {
-    try{
-        const {user_id} = req.user;
+  try {
+    const { user_id } = req.user;
 
-        const user = await User.findById(user_id).select('cards');
-        if(!user) return res.status(404).send({msg: `Usuario no encontrado`});
+    const user = await User.findById(user_id).select("cards");
+    if (!user) return res.status(404).send({ msg: `Usuario no encontrado` });
 
-        return res.status(200).send({msg: `Tarjetas obtenidas correctamente`, cards: user.cards});
-    }catch(error){
-        return res.status(500).send({msg: `Error al obtener tarjetas`, error: error.message});
+    return res
+      .status(200)
+      .send({ msg: `Tarjetas obtenidas correctamente`, cards: user.cards });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ msg: `Error al obtener tarjetas`, error: error.message });
+  }
+}
+
+async function addFavourite(req, res) {
+  try {
+    const { productId } = req.body;
+    const { user_id } = req.user;
+    const user = await User.findById(user_id);
+
+    if (!user) return res.status(404).send({ msg: `Usuario no encontrado.` });
+
+    const productObjectId = new mongoose.Types.ObjectId(productId);
+
+    if (
+      user.favorites.some(
+        (fav) =>
+          fav.productId &&
+          fav.productId.toString() === productObjectId.toString()
+      )
+    ) {
+      return res
+        .status(400)
+        .send({ msg: `El producto ya se encuentra en favoritos.` });
     }
+
+    user.favorites.push({ productId: productObjectId });
+    await user.save();
+
+    res.status(200).send({
+      msg: `Producto agregado a favoritos.`,
+      favorites: user.favorites,
+    });
+  } catch (error) {
+    res.status(500).send({
+      msg: `Error al intentar agregar el producto a favoritos.`,
+      error: error.message,
+    });
+  }
+}
+
+async function removeFavourite(req, res) {
+  try {
+    const { productId } = req.params;
+    const { user_id } = req.user;
+
+    // Buscar al usuario
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    // Convertir productId de string a ObjectId para comparación
+    const productObjectId = new mongoose.Types.ObjectId(productId);
+
+    // Verificar si el producto está en los favoritos
+    const favouriteIndex = user.favorites.findIndex(
+      (fav) =>
+        fav.productId && fav.productId.toString() === productObjectId.toString()
+    );
+
+    if (favouriteIndex === -1) {
+      return res.status(404).send({ msg: "El producto no está en favoritos" });
+    }
+
+    // Eliminar el producto de favoritos
+    user.favorites.splice(favouriteIndex, 1);
+    await user.save();
+
+    // Responder con los favoritos actualizados
+    res.status(200).send({
+      msg: "Producto eliminado de favoritos.",
+      favorites: user.favorites,
+    });
+  } catch (error) {
+    res.status(500).send({
+      msg: `Error al intentar eliminar el producto de favoritos.`,
+      error: error.message,
+    });
+  }
+}
+
+async function getFavourites(req, res) {
+  try {
+    const { user_id } = req.user;
+
+    const user = await User.findById(user_id).populate("favorites.productId");
+
+    if (!user) {
+      return res.status(404).send({ msg: "Usuario no encontrado" });
+    }
+
+    const sortedFavourites = (user.favorites || []).sort(
+      (a, b) => b.addedOn - a.addedOn
+    );
+
+    if (sortedFavourites.length === 0) {
+      return res
+        .status(200)
+        .send({ msg: "No tienes productos favoritos aún." });
+    }
+
+    res.status(200).send({ favorites: sortedFavourites });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ msg: `Error obteniendo favoritos`, error: error.message });
+  }
 }
 
 module.exports = {
@@ -161,4 +276,7 @@ module.exports = {
   getPhone,
   addCard,
   getCard,
+  addFavourite,
+  removeFavourite,
+  getFavourites,
 };
