@@ -17,7 +17,11 @@ function verifyToken(req, res, next) {
       return res.status(400).send({ msg: `Token expirado` });
     }
 
-    req.user = payload;
+    req.user = {
+      ...payload,
+      id: payload.user_id,
+      role: payload.role,
+    }
     next();
   } catch (error) {
     return res.status(400).send({ msg: `Token inválido` });
