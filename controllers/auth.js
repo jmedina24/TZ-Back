@@ -180,12 +180,10 @@ async function forgotPassword(req, res) {
       msg: `Verifique su cuenta de E-Mail para reestablecer su contraseña.`,
     });
   } catch (error) {
-    res
-      .status(500)
-      .send({
-        msg: `Error al enviar el E-Mail para reestablecer la contraseña`,
-        error: error.message,
-      });
+    res.status(500).send({
+      msg: `Error al enviar el E-Mail para reestablecer la contraseña`,
+      error: error.message,
+    });
   }
 }
 

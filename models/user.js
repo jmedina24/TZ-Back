@@ -1,17 +1,18 @@
 const mongoose = require('mongoose');
 
 const addressSchema = new mongoose.Schema({
+    reference: { type: String, enum: ['Casa', 'Trabajo', 'Otro'], default: 'Casa' },
     street: String,
     number: String,
     city: String,
     department: String,
     postalCode: String,
-}, { _id: false });
+});
 
 const phoneSchema = new mongoose.Schema({
     type: { type: String, enum: ['Celular', 'Fijo', 'Trabajo'], default: 'Celular' },
     number: String,
-}, { _id: false });
+});
 
 const favouriteSchema = new mongoose.Schema({
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -27,7 +28,7 @@ const cardSchema = new mongoose.Schema({
     type: {type: String, enum: ['Visa', 'MasterCard', 'AMEX'], required: true},
     bank: String,
     addedOn: {type: Date, default: Date.now},
-}, {_id: false});
+});
 
 const historySchema = new mongoose.Schema({
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Pedido' },

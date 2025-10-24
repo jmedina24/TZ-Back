@@ -70,7 +70,6 @@ async function updateProduct(req, res) {
   const { id } = req.params;
   const productData = req.body;
 
-  
   if (req.files.cover) {
     const imagePath = image.getFileName(req.files.cover);
     productData.cover = imagePath;
@@ -91,19 +90,17 @@ async function updateProduct(req, res) {
       .status(400)
       .send({ msg: `Error al actualizar el producto solicitado.` });
   }
-
-  res.status(200).send({ msg: `Ok` });
 }
 
 async function deleteProduct(req, res) {
-    const {id} = req.params;
+  const { id } = req.params;
 
-    try{
-        await Product.findByIdAndDelete(id);
-        res.status(200).send({msg: `Producto eliminado`});
-    }catch(error){
-        res.status(400).send({msg: `Error al intentar eliminar el producto`});
-    }
+  try {
+    await Product.findByIdAndDelete(id);
+    res.status(200).send({ msg: `Producto eliminado` });
+  } catch (error) {
+    res.status(400).send({ msg: `Error al intentar eliminar el producto` });
+  }
 }
 
 module.exports = {

@@ -56,6 +56,65 @@ async function getAddress(req, res) {
   }
 }
 
+async function updateAddress(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const updateData = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(400).send({ msg: `Usuario no encontrado` });
+
+    const address = user.addresses.id(id);
+    if (!address)
+      return res.status(404).send({ msg: `Dirección no encontrada` });
+
+    Object.assign(address, updateData);
+
+    await user.save();
+
+    return res.status(200).send({
+      msg: `Dirección actualizada correctamente`,
+      address,
+      addresses: user.addresses,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ msg: `Error al actualizar la dirección`, error: error.message });
+  }
+}
+
+async function deleteAddress(req, res) {
+  try {
+    const addressId = req.params.id;
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).send({ msg: `Usuario no encontrado` });
+
+    const initialLength = user.addresses.length;
+    user.addresses = user.addresses.filter(
+      (addr) => addr._id.toString() !== addressId
+    );
+
+    if (user.addresses.length === initialLength) {
+      return res.status(404).send({ msg: `Dirección no encontrada.` });
+    }
+
+    await user.save();
+
+    return res.status(200).send({
+      msg: `Dirección eliminada correctamente`,
+      addresses: user.addresses,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ msg: `Error al eliminar la dirección`, error: error.message });
+  }
+}
+
 async function addPhone(req, res) {
   try {
     const { user_id } = req.user;
@@ -95,6 +154,64 @@ async function getPhone(req, res) {
     return res
       .status(500)
       .send({ msg: `Error al obtener los teléfonos`, error: error.message });
+  }
+}
+
+async function updatePhone(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const updateData = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(400).send({ msg: `Usuario no encontrado` });
+
+    const phone = user.phones.id(id);
+    if (!phone) return res.status(404).send({ msg: `Teléfono no encontrado` });
+
+    Object.assign(phone, updateData);
+
+    await user.save();
+
+    return res.status(200).send({
+      msg: `Teléfono actualizado correctamente`,
+      phone,
+      phones: user.phones,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ msg: `Error al actualizar el teléfono`, error: error.message });
+  }
+}
+
+async function deletePhone(req, res) {
+  try {
+    const phoneId = req.params.id;
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).send({ msg: `Usuario no encontrado` });
+
+    const initialLength = user.phones.length;
+    user.phones = user.phones.filter(
+      (phone) => phone._id.toString() !== phoneId
+    );
+
+    if (user.phones.length === initialLength) {
+      return res.status(404).send({ msg: `Teléfono no encontrado.` });
+    }
+
+    await user.save();
+
+    return res.status(200).send({
+      msg: `Teléfono eliminado correctamente`,
+      phones: user.phones,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ msg: `Error al eliminar el teléfono`, error: error.message });
   }
 }
 
@@ -161,6 +278,62 @@ async function getCard(req, res) {
     return res
       .status(500)
       .send({ msg: `Error al obtener tarjetas`, error: error.message });
+  }
+}
+
+async function updateCard(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const updateData = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(400).send({ msg: `Usuario no encontrado` });
+
+    const card = user.cards.id(id);
+    if (!card) return res.status(404).send({ msg: `Tarjeta no encontrada` });
+
+    Object.assign(card, updateData);
+
+    await user.save();
+
+    return res.status(200).send({
+      msg: `Tarjeta actualizada correctamente`,
+      card,
+      cards: user.cards,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ msg: `Error al actualizar la tarjeta`, error: error.message });
+  }
+}
+
+async function deleteCard(req, res) {
+  try {
+    const cardId = req.params.id;
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).send({ msg: `Usuario no encontrado` });
+
+    const initialLength = user.cards.length;
+    user.cards = user.cards.filter((card) => card._id.toString() !== cardId);
+
+    if (user.cards.length === initialLength) {
+      return res.status(404).send({ msg: `Tarjeta no encontrada.` });
+    }
+
+    await user.save();
+
+    return res.status(200).send({
+      msg: `Tarjeta eliminada correctamente`,
+      cards: user.cards,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ msg: `Error al eliminar la tarjeta`, error: error.message });
   }
 }
 
@@ -272,10 +445,16 @@ module.exports = {
   getMe,
   addAddress,
   getAddress,
+  updateAddress,
+  deleteAddress,
   addPhone,
   getPhone,
+  updatePhone,
+  deletePhone,
   addCard,
   getCard,
+  updateCard,
+  deleteCard,
   addFavourite,
   removeFavourite,
   getFavourites,
