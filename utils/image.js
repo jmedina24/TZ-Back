@@ -1,8 +1,23 @@
+// utils/image.js
 function getFileName(file) {
-  const filePath = file.path;
-  const fileSplit = filePath.split("\\");
+  // con express-fileupload la ruta viene en tempFilePath
+  const filePath = file.path || file.tempFilePath;
 
-  return `${fileSplit[1]}/${fileSplit[2]}`;
+  if (!filePath) {
+    console.error("getFileName: filePath viene vacío", file);
+    return "";
+  }
+
+  // Soportar tanto Windows (\) como Linux (/)
+  const fileSplit = filePath.split(/[/\\]/);
+
+  // Tomamos los últimos dos segmentos: carpeta/archivo.ext
+  const len = fileSplit.length;
+  if (len < 2) {
+    return fileSplit[len - 1] || "";
+  }
+
+  return `${fileSplit[len - 2]}/${fileSplit[len - 1]}`;
 }
 
 module.exports = {

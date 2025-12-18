@@ -1,4 +1,5 @@
 const User = require("../models/user");
+const image = require("../utils/image");
 const mongoose = require("mongoose");
 
 async function getMe(req, res) {
@@ -441,6 +442,82 @@ async function getFavourites(req, res) {
   }
 }
 
+async function uploadAvatar(req, res) {
+  console.log("BODY:", req.body);
+  console.log("FILES:", req.files);
+
+  const { user_id } = req.user;
+
+  if (!req.files || !req.files.avatar) {
+    return res.status(400).send({ msg: "No se ha enviado ninguna imagen" });
+  }
+
+  try {
+    const user = await User.findById(user_id);
+
+    if (!user) {
+      return res.status(400).send({ msg: "Usuario no encontrado" });
+    }
+
+    const file = req.files.avatar;
+    const avatarPath = image.getFileName(file);
+
+    user.avatar = avatarPath;
+    await user.save();
+
+    return res.status(200).send({
+      msg: "Avatar actualizado correctamente",
+      avatar: user.avatar,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send({ msg: "Error al actualizar avatar" });
+  }
+}
+
+async function updatePersonalInformation(req, res) {
+  const { user_id } = req.user; // viene del token, igual que en getMe
+
+  if (!user_id) {
+    return res.status(401).send({ msg: "Usuario no autenticado" });
+  }
+
+  // Campos que permitimos editar desde el perfil
+  const { firstName, middleName, firstSurname, secondSurname, birthDate } =
+    req.body;
+
+  const updateData = {};
+
+  if (typeof firstName !== "undefined") updateData.firstName = firstName;
+  if (typeof middleName !== "undefined") updateData.middleName = middleName;
+  if (typeof firstSurname !== "undefined")
+    updateData.firstSurname = firstSurname;
+  if (typeof secondSurname !== "undefined")
+    updateData.secondSurname = secondSurname;
+
+  if (typeof birthDate !== "undefined") {
+    // Si viene vacío, la dejamos en null
+    updateData.birthDate = birthDate ? new Date(birthDate) : null;
+  }
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(user_id, updateData, {
+      new: true, // devuelve el user ya actualizado
+      runValidators: true, // aplica validaciones del schema
+    });
+
+    if (!updatedUser) {
+      return res.status(404).send({ msg: "Usuario no encontrado" });
+    }
+
+    // Devolvemos el usuario actualizado
+    res.status(200).send(updatedUser);
+  } catch (error) {
+    console.error("Error actualizando usuario", error);
+    res.status(500).send({ msg: "Error al actualizar el usuario" });
+  }
+}
+
 module.exports = {
   getMe,
   addAddress,
@@ -458,4 +535,6 @@ module.exports = {
   addFavourite,
   removeFavourite,
   getFavourites,
+  uploadAvatar,
+  updatePersonalInformation,
 };

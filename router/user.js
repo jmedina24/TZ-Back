@@ -54,4 +54,10 @@ api.delete(
 );
 api.get("/user/favorites", [md_auth.verifyToken], UserController.getFavourites);
 
+// Avatar
+api.post('/user/avatar', [md_auth.verifyToken], UserController.uploadAvatar);
+
+// Personal Information
+api.patch('/user/updateme', [md_auth.verifyToken], UserController.updatePersonalInformation);
+
 module.exports = api;
