@@ -60,4 +60,12 @@ api.post('/user/avatar', [md_auth.verifyToken], UserController.uploadAvatar);
 // Personal Information
 api.patch('/user/updateme', [md_auth.verifyToken], UserController.updatePersonalInformation);
 
+// CARRITO ✅
+api.get("/user/cart", [md_auth.verifyToken], UserController.getCart);
+api.post("/user/cart", [md_auth.verifyToken], UserController.addToCart);
+api.patch("/user/cart/:productId", [md_auth.verifyToken], UserController.updateCartQty);
+api.delete("/user/cart/:productId", [md_auth.verifyToken], UserController.removeCartItem);
+api.delete("/user/cart", [md_auth.verifyToken], UserController.clearCart);
+api.post("/user/cart/merge", [md_auth.verifyToken], UserController.mergeCart);
+
 module.exports = api;

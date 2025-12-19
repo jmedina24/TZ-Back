@@ -1,6 +1,19 @@
 const User = require("../models/user");
 const image = require("../utils/image");
 const mongoose = require("mongoose");
+const Product = require("../models/product");
+
+// Helpers
+function toObjectId(id) {
+  return new mongoose.Types.ObjectId(id);
+}
+
+function normalizeQty(qty) {
+  const n = Number(qty || 1);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.floor(n);
+}
+
 
 async function getMe(req, res) {
   const { user_id } = req.user;
@@ -518,6 +531,240 @@ async function updatePersonalInformation(req, res) {
   }
 }
 
+/**
+ * GET /user/cart
+ * Devuelve el carrito del usuario (con productos populados)
+ */
+async function getCart(req, res) {
+  try {
+    const { user_id } = req.user;
+
+    const user = await User.findById(user_id).populate("cart.productId");
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    // opcional: filtrar productos que ya no existan
+    const cart = (user.cart || []).filter((it) => it.productId);
+
+    return res.status(200).send({ cart });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error obteniendo carrito",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * POST /user/cart
+ * body: { productId, qty }
+ * Suma qty si el producto ya existe
+ */
+async function addToCart(req, res) {
+  try {
+    const { user_id } = req.user;
+    const { productId, qty } = req.body;
+
+    if (!productId) return res.status(400).send({ msg: "productId es requerido" });
+
+    const q = normalizeQty(qty);
+    const pid = toObjectId(productId);
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    const product = await Product.findById(pid);
+    if (!product || product.active === false) {
+      return res.status(404).send({ msg: "Producto no encontrado" });
+    }
+
+    const stock = Number(product.stock || 0);
+    if (stock <= 0) return res.status(400).send({ msg: "Producto sin stock" });
+
+    const idx = (user.cart || []).findIndex(
+      (it) => it.productId && it.productId.toString() === pid.toString()
+    );
+
+    if (idx >= 0) {
+      const nextQty = Math.min(stock, Number(user.cart[idx].qty || 1) + q);
+      user.cart[idx].qty = nextQty;
+    } else {
+      user.cart.push({ productId: pid, qty: Math.min(stock, q) });
+    }
+
+    await user.save();
+
+    const populated = await User.findById(user_id).populate("cart.productId");
+    return res.status(200).send({ msg: "Carrito actualizado", cart: populated.cart });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error al agregar al carrito",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * PATCH /user/cart/:productId
+ * body: { qty } (setea qty exacta)
+ */
+async function updateCartQty(req, res) {
+  try {
+    const { user_id } = req.user;
+    const { productId } = req.params;
+    const { qty } = req.body;
+
+    if (!productId) return res.status(400).send({ msg: "productId es requerido" });
+
+    const q = normalizeQty(qty);
+    const pid = toObjectId(productId);
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    const product = await Product.findById(pid);
+    if (!product || product.active === false) {
+      return res.status(404).send({ msg: "Producto no encontrado" });
+    }
+
+    const stock = Number(product.stock || 0);
+    if (stock <= 0) return res.status(400).send({ msg: "Producto sin stock" });
+
+    const idx = (user.cart || []).findIndex(
+      (it) => it.productId && it.productId.toString() === pid.toString()
+    );
+    if (idx === -1) return res.status(404).send({ msg: "Producto no está en el carrito" });
+
+    user.cart[idx].qty = Math.min(stock, q);
+    await user.save();
+
+    const populated = await User.findById(user_id).populate("cart.productId");
+    return res.status(200).send({ msg: "Cantidad actualizada", cart: populated.cart });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error al actualizar cantidad",
+      error: error.message,
+    });
+  }
+}
+
+
+/**
+ * DELETE /user/cart/:productId
+ */
+async function removeCartItem(req, res) {
+  try {
+    const { user_id } = req.user;
+    const { productId } = req.params;
+
+    const pid = toObjectId(productId);
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    const before = user.cart.length;
+    user.cart = (user.cart || []).filter(
+      (it) => !(it.productId && it.productId.toString() === pid.toString())
+    );
+
+    if (user.cart.length === before) {
+      return res.status(404).send({ msg: "Producto no estaba en el carrito" });
+    }
+
+    await user.save();
+
+    const populated = await User.findById(user_id).populate("cart.productId");
+    return res.status(200).send({ msg: "Producto eliminado del carrito", cart: populated.cart });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error al eliminar del carrito",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * DELETE /user/cart
+ */
+async function clearCart(req, res) {
+  try {
+    const { user_id } = req.user;
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    user.cart = [];
+    await user.save();
+
+    return res.status(200).send({ msg: "Carrito vaciado", cart: [] });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error al vaciar carrito",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * POST /user/cart/merge
+ * body: { items: [{ productId, qty }] }
+ * Suma cantidades (y respeta stock actual)
+ */
+async function mergeCart(req, res) {
+  try {
+    const { user_id } = req.user;
+    const { items } = req.body;
+
+    if (!Array.isArray(items)) {
+      return res.status(400).send({ msg: "items debe ser un array" });
+    }
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    // Armamos mapa actual del carrito
+    const map = new Map();
+    for (const it of user.cart || []) {
+      if (!it.productId) continue;
+      map.set(it.productId.toString(), Number(it.qty || 1));
+    }
+
+    // Para respetar stock, traemos productos involucrados
+    const ids = items
+      .map((x) => x?.productId)
+      .filter(Boolean)
+      .map((id) => new mongoose.Types.ObjectId(id));
+
+    const products = await Product.find({ _id: { $in: ids }, active: { $ne: false } });
+    const stockById = new Map(products.map((p) => [p._id.toString(), Number(p.stock || 0)]));
+
+    for (const it of items) {
+      if (!it?.productId) continue;
+      const pid = it.productId.toString();
+      const q = normalizeQty(it.qty);
+
+      const stock = stockById.get(pid) ?? 0;
+      if (stock <= 0) continue;
+
+      const current = map.get(pid) || 0;
+      map.set(pid, Math.min(stock, current + q));
+    }
+
+    user.cart = Array.from(map.entries()).map(([pid, qty]) => ({
+      productId: new mongoose.Types.ObjectId(pid),
+      qty,
+    }));
+
+    await user.save();
+
+    const populated = await User.findById(user_id).populate("cart.productId");
+    return res.status(200).send({ msg: "Carrito mergeado", cart: populated.cart });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error al mergear carrito",
+      error: error.message});
+  }
+}
+
 module.exports = {
   getMe,
   addAddress,
@@ -537,4 +784,10 @@ module.exports = {
   getFavourites,
   uploadAvatar,
   updatePersonalInformation,
+  getCart,
+  addToCart,
+  updateCartQty,
+  removeCartItem,
+  clearCart,
+  mergeCart,
 };

@@ -63,4 +63,11 @@ const ProductSchema = mongoose.Schema(
   }
 );
 
+// Búsqueda full-text
+ProductSchema.index({
+  brand: "text",
+  model: "text",
+  description: "text",
+});
+
 module.exports = mongoose.model("Product", ProductSchema);

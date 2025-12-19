@@ -30,6 +30,15 @@ const favouriteSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const CartItemSchema = new mongoose.Schema(
+  {
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    qty: { type: Number, default: 1, min: 1 },
+    addedOn: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const cardSchema = new mongoose.Schema({
   cardNumber: { type: String, required: true },
   cardHolder: { type: String, required: true },
@@ -63,6 +72,7 @@ const UserSchema = new mongoose.Schema(
     addresses: [addressSchema],
     cards: [cardSchema],
     favorites: [favouriteSchema],
+    cart: { type: [CartItemSchema], default: [] },
     orders: [historySchema],
     role: {
       type: String,
