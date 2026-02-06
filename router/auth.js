@@ -7,6 +7,7 @@ const api = express.Router();
 // Login y registro
 api.post('/auth/register', AuthController.register);
 api.post('/auth/login', AuthController.login);
+api.post('/auth/check-email', AuthController.checkEmail);
 
 // Verificar cuenta (vía E-Mail)
 api.get('/user/verify/:token', AuthController.verifyUser);

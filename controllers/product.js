@@ -103,9 +103,30 @@ async function deleteProduct(req, res) {
   }
 }
 
+async function getProductById(req, res) {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).send({ msg: "Producto no encontrado" });
+    }
+
+    // Si tenés "active" y querés ocultar inactivos:
+    if (product.active === false) {
+      return res.status(404).send({ msg: "Producto no disponible" });
+    }
+
+    return res.status(200).send({ product });
+  } catch (error) {
+    return res.status(500).send({ msg: "Error obteniendo producto" });
+  }
+}
+
 module.exports = {
   addProduct,
   getProducts,
   updateProduct,
   deleteProduct,
+  getProductById,
 };

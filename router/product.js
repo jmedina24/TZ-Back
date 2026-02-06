@@ -10,6 +10,7 @@ const md_upload = multiparty({ uploadDir: "./uploads/products" });
 
 api.post("/product/add", [verifyToken, checkRole(['admin']), md_upload], ProductController.addProduct);
 api.get("/product/get", ProductController.getProducts);
+api.get("/product/:id", ProductController.getProductById);
 api.put("/product/update/:id", [verifyToken, checkRole(['admin']), md_upload], ProductController.updateProduct);
 api.delete("/product/delete/:id", [verifyToken, checkRole(['admin']), md_upload], ProductController.deleteProduct);
 

@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
 const jwt = require("../utils/jwt");
+const { isValidPassword, passwordErrorMsg } = require("../utils/passwordRules");
 
 async function register(req, res) {
   try {
@@ -15,6 +16,7 @@ async function register(req, res) {
       secondSurname,
       birthDate,
     } = req.body;
+
     const errors = [];
 
     if (!email) errors.push("E-Mail obligatorio");
@@ -28,8 +30,15 @@ async function register(req, res) {
       return res.status(400).json({ errors });
     }
 
+    // ✅ validar password fuerte
+    if (!isValidPassword(password)) {
+      return res.status(400).send({ msg: passwordErrorMsg() });
+    }
+
+    const emailLower = email.toLowerCase();
+
     // Verificar si ya existe
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: emailLower });
     if (existingUser) {
       return res
         .status(400)
@@ -45,7 +54,7 @@ async function register(req, res) {
 
     // Crear usuario
     const user = new User({
-      email: email.toLowerCase(),
+      email: emailLower,
       password: hashPassword,
       firstName,
       middleName,
@@ -69,27 +78,44 @@ async function register(req, res) {
       },
     });
 
-    const verifyUrl = `${process.env.BACKEND_URL}/api/v1/auth/verify/${verificationToken}`;
+    const verifyUrl = `${process.env.BACKEND_URL}/user/verify/${verificationToken}`;
 
     // Enviar mail
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
+      to: emailLower,
       subject: "TechZone - Verificación de su cuenta",
       html: `<p>¡Hola ${firstName} ${firstSurname}!,</p>
       <p>Haz click en el siguiente link para activar tu cuenta:</p>
       <a href="${verifyUrl}">${verifyUrl}</a>`,
     });
 
-    res.status(201).send({
+    return res.status(201).send({
       msg: `Usuario registrado correctamente. Revise su correo electrónico para activar la cuenta.`,
     });
   } catch (error) {
-    res
+    return res
       .status(400)
       .send({ msg: `Error al crear el usuario: ${error.message}` });
   }
-  res.status(400).send({ msg: `Error al crear el usuario', ${error}` });
+}
+
+async function checkEmail(req, res) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).send({ msg: `E-Mail obligatorio` });
+    }
+
+    const existingUser = await User.findOne({
+      email: email.toLowerCase(),
+    }).select("_id");
+
+    return res.status(200).send({ exists: !!existingUser });
+  } catch (error) {
+    return res.status(500).send({ msg: `Error al verificar el E-Mail` });
+  }
 }
 
 async function verifyUser(req, res) {
@@ -98,30 +124,26 @@ async function verifyUser(req, res) {
 
     // Buscar al usuario por token
     const user = await User.findOne({ verificationToken: token });
-    if (!user)
-      return res
-        .status(400)
-        .send({ msg: `Token inválido o usuario no encontrado.` });
+    if (!user) {
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/?verified=0&reason=invalid`
+      );
+    }
 
     // Activar usuario
     user.active = true;
     user.verificationToken = undefined;
     await user.save();
 
-    res.send({
-      msg: `Usuario verificado correctamente. Ya puedes iniciar sesión en el sitio.`,
-    });
+    return res.redirect(`${process.env.FRONTEND_URL}/?verified=1`);
   } catch (error) {
-    res
-      .status(500)
-      .send({ msg: `Error al verificar el usuario: `, error: error.message });
+    return res.redirect(`${process.env.FRONTEND_URL}/?verified=0&reason=server`);
   }
 }
 
 async function login(req, res) {
   const { email, password } = req.body;
 
-  // mensaje genérico por seguridad
   const genericError = { msg: "Usuario o contraseña incorrecto" };
 
   if (!email) return res.status(400).send(genericError);
@@ -139,13 +161,14 @@ async function login(req, res) {
     if (!check) {
       return res.status(400).send(genericError);
     }
+
     if (!user.active) {
       return res.status(401).send({ msg: `Usuario inactivo` });
     }
 
     return res.status(200).send({ token: jwt.createAccessToken(user) });
   } catch (error) {
-    res.status(500).send({ msg: "Error en el servidor" });
+    return res.status(500).send({ msg: "Error en el servidor" });
   }
 }
 
@@ -155,7 +178,9 @@ async function forgotPassword(req, res) {
   if (!email) return res.status(400).send({ msg: "E-Mail obligatorio" });
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const emailLower = email.toLowerCase();
+
+    const user = await User.findOne({ email: emailLower });
     if (!user) return res.status(404).send({ msg: "Usuario no encontrado." });
 
     // 1) Generar token y expiración (1 hora)
@@ -166,9 +191,12 @@ async function forgotPassword(req, res) {
 
     // 2) URL que debe abrir el usuario (FRONT)
     const frontendBase =
-      process.env.FRONTEND_URL || "http://localhost:5173"; // 🔧 ajustá tu puerto si es otro
+      process.env.FRONTEND_URL || "http://localhost:5173";
 
-    const resetUrl = `${frontendBase}/reset-password/${token}`;
+    // ✅ opcional: mandar email como query para prefill login luego
+    const resetUrl = `${frontendBase}/reset-password/${token}?email=${encodeURIComponent(
+      emailLower
+    )}`;
 
     // 3) Configurar E-Mail
     const transporter = nodemailer.createTransport({
@@ -179,10 +207,10 @@ async function forgotPassword(req, res) {
       },
     });
 
-    // 4) Enviar mail apuntando al FRONT (no al backend)
+    // 4) Enviar mail apuntando al FRONT
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
+      to: emailLower,
       subject: "TechZone - Restablecer contraseña",
       html: `
         <p>Hacé click en el siguiente enlace para restablecer tu contraseña:</p>
@@ -202,13 +230,18 @@ async function forgotPassword(req, res) {
   }
 }
 
-
 async function resetPassword(req, res) {
   const { token } = req.params;
   const { password } = req.body;
 
-  if (!password)
+  if (!password) {
     return res.status(400).send({ msg: `Campo contraseña obligatorio.` });
+  }
+
+  // ✅ validar password fuerte
+  if (!isValidPassword(password)) {
+    return res.status(400).send({ msg: passwordErrorMsg() });
+  }
 
   try {
     const user = await User.findOne({
@@ -216,8 +249,9 @@ async function resetPassword(req, res) {
       resetPasswordExpires: { $gt: Date.now() },
     });
 
-    if (!user)
+    if (!user) {
       return res.status(400).send({ msg: `Token inválido o expirado` });
+    }
 
     // Actualizar clave
     const salt = bcrypt.genSaltSync(10);
@@ -227,20 +261,26 @@ async function resetPassword(req, res) {
 
     await user.save();
 
-    res.status(200).send({ msg: `Contraseña actualizada correctamente.` });
+    return res.status(200).send({ msg: `Contraseña actualizada correctamente.` });
   } catch (error) {
-    res
-      .status(500)
-      .send({ msg: `Error al cambiar la contraseña.`, error: error.messsage });
+    return res.status(500).send({
+      msg: `Error al cambiar la contraseña.`,
+      error: error.message,
+    });
   }
 }
 
 async function changePassword(req, res) {
-  const userId = req.user?.id || req.user?._id; // según tu auth middleware
+  const userId = req.user?.id || req.user?._id;
   const { currentPassword, newPassword } = req.body;
 
   if (!currentPassword || !newPassword) {
     return res.status(400).send({ msg: "Campos obligatorios." });
+  }
+
+  // ✅ validar password fuerte
+  if (!isValidPassword(newPassword)) {
+    return res.status(400).send({ msg: passwordErrorMsg() });
   }
 
   try {
@@ -248,7 +288,9 @@ async function changePassword(req, res) {
     if (!user) return res.status(404).send({ msg: "Usuario no encontrado." });
 
     const ok = await bcrypt.compare(currentPassword, user.password);
-    if (!ok) return res.status(400).send({ msg: "Contraseña actual incorrecta." });
+    if (!ok) {
+      return res.status(400).send({ msg: "Contraseña actual incorrecta." });
+    }
 
     const salt = bcrypt.genSaltSync(10);
     user.password = bcrypt.hashSync(newPassword, salt);
@@ -256,15 +298,18 @@ async function changePassword(req, res) {
 
     return res.status(200).send({ msg: "Contraseña actualizada correctamente." });
   } catch (error) {
-    return res.status(500).send({ msg: "Error al cambiar la contraseña.", error: error.message });
+    return res.status(500).send({
+      msg: "Error al cambiar la contraseña.",
+      error: error.message,
+    });
   }
 }
-
 
 module.exports = {
   register,
   verifyUser,
   login,
+  checkEmail,
   forgotPassword,
   resetPassword,
   changePassword,

@@ -13,6 +13,8 @@ const addressSchema = new mongoose.Schema({
   postalCode: String,
 });
 
+
+
 const phoneSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -30,6 +32,16 @@ const favouriteSchema = new mongoose.Schema(
   { _id: false }
 );
 
+
+const cartItemSchema = new mongoose.Schema(
+  {
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    qty: { type: Number, default: 1, min: 1 },
+    addedOn: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const cardSchema = new mongoose.Schema({
   cardNumber: { type: String, required: true },
   cardHolder: { type: String, required: true },
@@ -38,6 +50,12 @@ const cardSchema = new mongoose.Schema({
   securityCode: { type: Number, required: true },
   type: { type: String, enum: ["Visa", "MasterCard", "AMEX"], required: true },
   bank: String,
+  cardCategory: {
+    type: String,
+    enum: ["Crédito", "Débito"],
+    default: "Crédito",
+    required: true,
+  },
   addedOn: { type: Date, default: Date.now },
 });
 
@@ -63,6 +81,7 @@ const UserSchema = new mongoose.Schema(
     addresses: [addressSchema],
     cards: [cardSchema],
     favorites: [favouriteSchema],
+    cart: [cartItemSchema],
     orders: [historySchema],
     role: {
       type: String,

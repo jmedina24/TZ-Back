@@ -54,6 +54,14 @@ api.delete(
 );
 api.get("/user/favorites", [md_auth.verifyToken], UserController.getFavourites);
 
+// Cart
+api.post("/user/cart", [md_auth.verifyToken], UserController.addToCart);
+api.delete("/user/cart/:productId", [md_auth.verifyToken], UserController.removeFromCart);
+api.patch("/user/cart/:productId/decrement", [md_auth.verifyToken], UserController.decrementCartItem);
+api.get("/user/cart", [md_auth.verifyToken], UserController.getCart);
+
+
+
 // Avatar
 api.post('/user/avatar', [md_auth.verifyToken], UserController.uploadAvatar);
 

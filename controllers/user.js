@@ -442,6 +442,141 @@ async function getFavourites(req, res) {
   }
 }
 
+// ✅ ADD (si existe suma qty, si no lo agrega)
+async function addToCart(req, res) {
+  try {
+    const { productId, qty = 1 } = req.body;
+    const { user_id } = req.user;
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado." });
+
+    const productObjectId = new mongoose.Types.ObjectId(productId);
+    const nQty = Math.max(1, Number(qty) || 1);
+
+    const idx = user.cart.findIndex(
+      (it) => it.productId && it.productId.toString() === productObjectId.toString()
+    );
+
+    if (idx >= 0) {
+      user.cart[idx].qty = (user.cart[idx].qty || 1) + nQty;
+      user.cart[idx].addedOn = new Date(); // opcional: lo “refresca”
+    } else {
+      user.cart.push({ productId: productObjectId, qty: nQty });
+    }
+
+    await user.save();
+
+    return res.status(200).send({
+      msg: "Producto agregado al carrito.",
+      cart: user.cart,
+    });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error al intentar agregar el producto al carrito.",
+      error: error.message,
+    });
+  }
+}
+
+// ✅ REMOVE (elimina item entero)
+async function removeFromCart(req, res) {
+  try {
+    const { productId } = req.params;
+    const { user_id } = req.user;
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    const productObjectId = new mongoose.Types.ObjectId(productId);
+
+    const idx = user.cart.findIndex(
+      (it) => it.productId && it.productId.toString() === productObjectId.toString()
+    );
+
+    if (idx === -1) {
+      return res.status(404).send({ msg: "El producto no está en el carrito" });
+    }
+
+    user.cart.splice(idx, 1);
+    await user.save();
+
+    return res.status(200).send({
+      msg: "Producto removido del carrito.",
+      cart: user.cart,
+    });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error al intentar eliminar el producto del carrito.",
+      error: error.message,
+    });
+  }
+}
+
+// ✅ DECREMENT (resta 1 o elimina si queda en 0)
+async function decrementCartItem(req, res) {
+  try {
+    const { productId } = req.params;
+    const { user_id } = req.user;
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    const productObjectId = new mongoose.Types.ObjectId(productId);
+
+    const idx = user.cart.findIndex(
+      (it) => it.productId && it.productId.toString() === productObjectId.toString()
+    );
+
+    if (idx === -1) {
+      return res.status(404).send({ msg: "El producto no está en el carrito" });
+    }
+
+    const currentQty = Number(user.cart[idx].qty) || 1;
+
+    if (currentQty <= 1) {
+      user.cart.splice(idx, 1);
+    } else {
+      user.cart[idx].qty = currentQty - 1;
+    }
+
+    await user.save();
+
+    return res.status(200).send({
+      msg: "Carrito actualizado.",
+      cart: user.cart,
+    });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error actualizando carrito.",
+      error: error.message,
+    });
+  }
+}
+
+// ✅ GET (con populate para devolver info de productos)
+async function getCart(req, res) {
+  try {
+    const { user_id } = req.user;
+
+    const user = await User.findById(user_id).populate("cart.productId");
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    const sortedCart = (user.cart || []).sort((a, b) => b.addedOn - a.addedOn);
+
+    if (sortedCart.length === 0) {
+      return res.status(200).send({ msg: "Tu carrito está vacío.", cart: [] });
+    }
+
+    return res.status(200).send({ cart: sortedCart });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error obteniendo carrito",
+      error: error.message,
+    });
+  }
+}
+
 async function uploadAvatar(req, res) {
   console.log("BODY:", req.body);
   console.log("FILES:", req.files);
@@ -518,6 +653,47 @@ async function updatePersonalInformation(req, res) {
   }
 }
 
+async function mergeCart(req, res) {
+  try {
+    const { user_id } = req.user;
+    const { items = [] } = req.body;
+
+    const user = await User.findById(user_id);
+    if (!user) return res.status(404).send({ msg: "Usuario no encontrado" });
+
+    for (const item of items) {
+      const productObjectId = new mongoose.Types.ObjectId(item.productId);
+      const nQty = Math.max(1, Number(item.qty) || 1);
+
+      const idx = user.cart.findIndex(
+        (it) => it.productId.toString() === productObjectId.toString()
+      );
+
+      if (idx >= 0) {
+        user.cart[idx].qty += nQty;
+        user.cart[idx].addedOn = new Date();
+      } else {
+        user.cart.push({ productId: productObjectId, qty: nQty });
+      }
+    }
+
+    await user.save();
+
+    const populatedUser = await User.findById(user_id).populate("cart.productId");
+
+    return res.status(200).send({
+      msg: "Carrito sincronizado correctamente",
+      cart: populatedUser.cart,
+    });
+  } catch (error) {
+    return res.status(500).send({
+      msg: "Error sincronizando carrito",
+      error: error.message,
+    });
+  }
+}
+
+
 module.exports = {
   getMe,
   addAddress,
@@ -537,4 +713,9 @@ module.exports = {
   getFavourites,
   uploadAvatar,
   updatePersonalInformation,
+  addToCart,
+  removeFromCart,
+  decrementCartItem,
+  getCart,
+  mergeCart,
 };

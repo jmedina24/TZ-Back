@@ -1,30 +1,37 @@
 const express = require("express");
+const api = express.Router();
+const { downloadInvoice } = require("../controllers/purchase");
+const { sendInvoiceEmail } = require("../controllers/purchase");
+
 const md_auth = require("../middlewares/authenticated");
-const checkRole = require("../middlewares/checkRole");
 const PurchaseController = require("../controllers/purchase");
 
-const api = express.Router();
-
 api.post(
-  "/purchase/add",
+  "/purchase/checkout",
   [md_auth.verifyToken],
-  PurchaseController.addPurchase
+  PurchaseController.checkoutFromCart
 );
+
 api.get(
   "/purchase/history",
   [md_auth.verifyToken],
   PurchaseController.getHistory
 );
+
 api.get(
   "/purchase/:id",
   [md_auth.verifyToken],
   PurchaseController.getPurchaseById
 );
 
-api.put(
+api.patch(
   "/purchase/:id/status",
-  [md_auth.verifyToken, checkRole(["admin"])],
+  [md_auth.verifyToken],
   PurchaseController.updateStatus
 );
+
+api.get("/purchase/:id/invoice", [md_auth.verifyToken], PurchaseController.downloadInvoice);
+api.post("/purchase/:id/invoice/email", [md_auth.verifyToken], PurchaseController.sendInvoiceEmail);
+
 
 module.exports = api;
