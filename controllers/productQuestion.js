@@ -1,5 +1,6 @@
 const ProductQuestion = require("../models/productQuestion");
 const Product = require("../models/product");
+const Notification = require('../models/notification');
 
 // Elegí los campos reales que tenga tu User
 // (si tu User tiene "name", "lastname", "email" etc)
@@ -59,13 +60,13 @@ async function addQuestion(req, res) {
   }
 }
 
-
 async function answerQuestion(req, res) {
   try {
     const { questionId } = req.params;
     const { answer } = req.body;
 
-    if (!answer || !String(answer).trim()) {
+    const cleanAnswer = String(answer || "").trim();
+    if (!cleanAnswer) {
       return res.status(400).send({ msg: "La respuesta es requerida." });
     }
 
@@ -74,7 +75,7 @@ async function answerQuestion(req, res) {
     const updated = await ProductQuestion.findByIdAndUpdate(
       questionId,
       {
-        answer: String(answer).trim(),
+        answer: cleanAnswer,
         status: "answered",
         answeredBy: adminId,
         answeredAt: new Date(),
@@ -87,12 +88,38 @@ async function answerQuestion(req, res) {
 
     if (!updated) return res.status(404).send({ msg: "Pregunta no encontrada." });
 
+    // ✅ userId puede venir poblado
+    const targetUserId = updated?.userId?._id || updated?.userId;
+
+    // ✅ notificación NO debe romper el endpoint
+    try {
+      if (targetUserId) {
+        const targetUserId = updated?.userId?._id || updated?.userId;
+        console.log("Notif -> targetUserId:", targetUserId);
+        console.log("Notif -> updated.userId:", updated.userId);
+
+        await Notification.create({
+          userId: targetUserId,
+          type: "question_answered",
+          title: "Respondimos tu pregunta",
+          message: "Tu consulta fue respondida por nuestro equipo.",
+          meta: {
+            productId: updated.productId,
+            questionId: updated._id,
+          },
+        });
+      }
+    } catch (e) {
+      console.error("⚠️ Error creando notificación question_answered:", e?.message || e);
+    }
+
     return res.status(200).send(updated);
   } catch (e) {
     console.error(e);
     return res.status(500).send({ msg: "Error respondiendo pregunta." });
   }
 }
+
 
 module.exports = {
   getQuestionsByProduct,

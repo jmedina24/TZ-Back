@@ -5,6 +5,8 @@ const Product = require("../models/product");
 const User = require("../models/user");
 const { buildInvoicePdfBuffer } = require("../utils/invoicePdf");
 const path = require("path");
+const Notification = require("../models/notification");
+
 
 // =======================
 // Helpers
@@ -154,6 +156,18 @@ async function checkoutFromCart(req, res) {
       status: "Confirmada",
       paymentMethod,
       paymentDetails: finalPaymentDetails,
+    });
+
+    // ✅ 5.1) Notificación: compra creada
+    await Notification.create({
+      userId, // el que comprórs
+      type: "purchase_created",
+      title: "Compra confirmada",
+      message: `Tu compra #${String(newPurchase._id).slice(-8).toUpperCase()} fue confirmada.`,
+      meta: {
+        purchaseId: newPurchase._id,
+        status: "Confirmada",
+      },
     });
 
     // 6) Descontar stock + sold (seguro)
@@ -318,14 +332,35 @@ async function updateStatus(req, res) {
     const purchase = await Purchase.findById(id);
     if (!purchase) return res.status(404).send({ msg: "Compra no encontrada." });
 
+    const prevStatus = purchase.status;
     purchase.status = status;
     await purchase.save();
+
+    // ✅ notificación solo si cambió
+    if (String(prevStatus || "") !== String(status || "")) {
+      try {
+        const ownerId = purchase.userId?._id || purchase.userId;
+        if (ownerId) {
+          await Notification.create({
+            userId: ownerId,
+            type: "purchase_status_changed",
+            title: "Actualización de tu compra",
+            message: `Tu compra #${String(purchase._id).slice(-8).toUpperCase()} pasó a estado: ${status}.`,
+            meta: { purchaseId: purchase._id, status },
+          });
+        }
+      } catch (e) {
+        console.error("⚠️ Error creando notificación purchase_status_changed:", e?.message || e);
+      }
+    }
 
     return res.status(200).send({ msg: "Estado actualizado", purchase });
   } catch (error) {
     return res.status(500).send({ msg: "Error al actualizar", error: error.message });
   }
 }
+
+
 
 // =======================
 // Descargar factura PDF

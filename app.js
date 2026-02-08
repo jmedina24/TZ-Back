@@ -29,6 +29,7 @@ const categories = require('./router/category');
 const productRoutes = require('./router/product');
 const purchaseRoutes = require('./router/purchase');
 const productQuestionRoutes = require('./router/productQuestion');
+const notificationRoutes = require('./router/notification');
 
 // Configuración de rutas
 app.use(`/api/${apiVersion}`, authRoutes);
@@ -37,6 +38,7 @@ app.use(`/api/${apiVersion}/categories`, categories);
 app.use(`/api/${apiVersion}`, productRoutes);
 app.use(`/api/${apiVersion}`, purchaseRoutes);
 app.use(`/api/${apiVersion}`, productQuestionRoutes);
+app.use(`/api/${apiVersion}`, notificationRoutes);
 
 // Configuración de Static Folder
 app.use(express.static('uploads')); // esto sirve lo que haya dentro de /uploads en la raíz
